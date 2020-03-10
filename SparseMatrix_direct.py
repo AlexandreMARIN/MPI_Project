@@ -205,3 +205,10 @@ for im in range(mask.shape[0]):
 #VSM.view( coords, elt2verts, nbDoms, vert2dom, indInterfNodes = interfNodes, title='Partition par sommets', colmap= plt.cm.tab20c)
 
 file.close()
+#A faire :
+#par éléments
+#1 - créer les maillages locaux
+#2 - matrices locales
+#3 - second membre locaux
+#4 - réunion des résultats
+#5 - ?
