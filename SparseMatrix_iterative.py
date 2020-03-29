@@ -37,7 +37,7 @@ file.write("Nombre de processus : {}\n".format(nbDoms))
 
 ########################
 if rank == 0:
-    m = mesh.read("CarreMedium.msh")
+    m = mesh.read("CarrePetit.msh")
     coords    = m[0]
     elt2verts = m[1]
     nbVerts = coords.shape[0]
@@ -210,6 +210,7 @@ file.write("toNullify:\n"+str(toNullify)+"\n")#"to suppress"
 for ip in range(rank+1, nbDoms):
     comm.send(bdry, dest=ip)
 
+
 # Il faut maintenant tenir compte des conditions limites :
 for iVert in bdry:
     iVloc = v_glo2loc[iVert]
@@ -258,6 +259,8 @@ def display_iter(x_k):
     print("iteration {:03d} : ||A.xk-b||/||b|| = {}".format(iteration, np.linalg.norm(spMatrix * x_k - b)/np.linalg.norm(b)))
     iteration += 1
 
+file.write("spMat_loc:\n"+str(spMatrix))
+
 def prodMV(x):
     x_loc = np.zeros(nbV_loc)
     for iVloc in range(nbV_loc):
@@ -277,13 +280,35 @@ def prodMV(x):
         partOfy += recvbuf[ip*nbVerts:(ip+1)*nbVerts]
     return partOfy
 
-x=np.empty(nbVerts)
+x=np.zeros(nbVerts)
 x[0]=1
+x[8] = 0.6
 y= prodMV(x)
 print("e_i: ", y)
 
+file.write("matloc*b_loc:\n"+str(spMatrix.dot(b)))
 
-sol, info = solver_gc(None, bGlo, prodMatVect=prodMV, verbose=True)
+nodesToConsider = set()
+for iVloc in range(nbV_loc):
+    iVglo = v_loc2glo[iVloc]
+    nodesToConsider.add(iVglo)
+
+nodesToConsider -= (interfNodesToDiscard | toNullify)
+
+def scalarProd(x, y):
+    partOfRes = 0
+    for iV in nodesToConsider:
+        partOfRes += x[iV]*y[iV]
+    partsOfRes = comm.allgather(partOfRes)
+    for ip in range(rank):
+        partOfRes += partsOfRes[ip]
+    for ip in range(rank+1, nbDoms):
+        partOfRes += partsOfRes[ip]
+    return partOfRes
+
+print("e1^2:", str(scalarProd(x, x)))
+
+sol, info = solver_gc(None, bGlo, prodMatVect=prodMV, verbose=(rank==0), prodScal=scalarProd)
 if rank==0:
     print("sol: ", sol)
     # Visualisation de la solution :
