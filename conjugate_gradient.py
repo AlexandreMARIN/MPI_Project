@@ -71,6 +71,6 @@ def solver_gc( A, b, x0 = None, M = None, tol = 1.E-7, niterMax=100,
         err = dotS(r,r)
         nit += 1
         if verbose:
-            print("||r_{nit:03}||_L2 : {}".format(sqrt(err/err0)))
+            print("||r_{}||_L2 : {}".format(nit, sqrt(err/err0)))
     return x, (sqrt(err/err0), nit)
     

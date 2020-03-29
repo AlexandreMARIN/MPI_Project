@@ -37,7 +37,7 @@ file.write("Nombre de processus : {}\n".format(nbDoms))
 
 ########################
 if rank == 0:
-    m = mesh.read("CarrePetit.msh")
+    m = mesh.read("CarreMedium.msh")
     coords    = m[0]
     elt2verts = m[1]
     nbVerts = coords.shape[0]
@@ -258,10 +258,36 @@ def display_iter(x_k):
     print("iteration {:03d} : ||A.xk-b||/||b|| = {}".format(iteration, np.linalg.norm(spMatrix * x_k - b)/np.linalg.norm(b)))
     iteration += 1
 
-#def prodMV(x):
+def prodMV(x):
+    x_loc = np.zeros(nbV_loc)
+    for iVloc in range(nbV_loc):
+        iVglo = v_loc2glo[iVloc]
+        x_loc[iVloc] = x[iVglo]
+    y_loc = spMatrix.dot(x_loc)
+    partOfy = np.zeros(nbVerts)
+    for iVloc in range(nbV_loc):
+        iVglo = v_loc2glo[iVloc]
+        partOfy[iVglo] = y_loc[iVloc]
 
-#sol, info = solver_gc(None, b, prodMatVect, verbose=True)
-#print(sol)
+    recvbuf = np.empty(nbVerts*nbDoms)
+    comm.Allgather(sendbuf=partOfy, recvbuf=recvbuf)
+    for ip in range(rank):
+        partOfy += recvbuf[ip*nbVerts:(ip+1)*nbVerts]
+    for ip in range(rank+1, nbDoms):
+        partOfy += recvbuf[ip*nbVerts:(ip+1)*nbVerts]
+    return partOfy
+
+x=np.empty(nbVerts)
+x[0]=1
+y= prodMV(x)
+print("e_i: ", y)
+
+
+sol, info = solver_gc(None, bGlo, prodMatVect=prodMV, verbose=True)
+if rank==0:
+    print("sol: ", sol)
+    # Visualisation de la solution :
+    VS.view( coords, elt2verts, sol, title = "Solution" )
 #d = spMatrix.dot(sol) - b
 #print("||A.x-b||/||b|| = {}".format(sqrt(d.dot(d)/b.dot(b))))
 # Visualisation de la solution :
